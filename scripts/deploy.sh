@@ -17,6 +17,11 @@ if [[ -z "$IMAGE_TAG" || -z "$APP_VERSION" || -z "$APP_COLOR" || -z "$TARGET_POR
     exit 1
 fi
 
+if [[ "$TARGET_PORT" != "5001" && "$TARGET_PORT" != "5002" ]]; then
+    echo "ERROR: Target port must be 5001 or 5002."
+    exit 1
+fi
+
 if [[ "$EUID" -ne 0 ]]; then
     echo "Please run this script with sudo."
     exit 1
@@ -28,7 +33,7 @@ if [[ ! -f "$UPSTREAM_FILE" ]]; then
 fi
 
 IMAGE="zero-downtime-app:${IMAGE_TAG}"
-CONTAINER_NAME="flask-${IMAGE_TAG}"
+CONTAINER_NAME="flask-${TARGET_PORT}"
 
 # Find the port currently receiving traffic.
 CURRENT_PORT=$(awk '/server 127.0.0.1:/ {sub(/^.*:/, "", $2); sub(/;$/, "", $2); print $2}' "$UPSTREAM_FILE")
@@ -52,8 +57,12 @@ fi
 echo "Current active port: $CURRENT_PORT"
 echo "Preparing version $APP_VERSION on port $TARGET_PORT..."
 
-# Replace only the inactive version's container.
-docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+# Replace only containers using the inactive target port.
+while IFS= read -r container_id; do
+    if [[ -n "$container_id" ]]; then
+        docker rm -f "$container_id" >/dev/null
+    fi
+done < <(docker ps -aq --filter "publish=${TARGET_PORT}")
 
 docker run -d \
     --name "$CONTAINER_NAME" \
