@@ -41,39 +41,42 @@ pipeline {
             }
         }
 
-        stage('Determine Deployment Target') {
-            steps {
-                script {
-                    def activePort = sh(
-                        script: """
-                            awk '/server 127.0.0.1:/ {
-                                sub(/^.*:/, "", \\$2)
-                                sub(/;/, "", \\$2)
-                                print \\$2
-                            }' /etc/nginx/conf.d/flask-upstream.conf
-                        """,
-                        returnStdout: true
-                    ).trim()
+        
+stage('Determine Deployment Target') {
+    steps {
+        script {
+            def activePort = sh(
+                script: '''
+                    awk '/server 127.0.0.1:/ {
+                        sub(/^.*:/, "", $2)
+                        sub(/;/, "", $2)
+                        print $2
+                    }' /etc/nginx/conf.d/flask-upstream.conf
+                ''',
+                returnStdout: true
+            ).trim()
 
-                    echo "Currently active port: ${activePort}"
+            echo "Currently active port: ${activePort}"
 
-                    if (activePort == '5001') {
-                        env.TARGET_PORT = '5002'
-                        env.APP_COLOR = 'green'
-                    } else if (activePort == '5002') {
-                        env.TARGET_PORT = '5001'
-                        env.APP_COLOR = 'blue'
-                    } else {
-                        error("Unexpected active Nginx port: ${activePort}")
-                    }
-
-                    echo "New application version: ${env.APP_VERSION}"
-                    echo "Deployment target port: ${env.TARGET_PORT}"
-                    echo "Application color: ${env.APP_COLOR}"
-                }
+            if (activePort == '5001') {
+                env.TARGET_PORT = '5002'
+                env.APP_COLOR = 'green'
+            } else if (activePort == '5002') {
+                env.TARGET_PORT = '5001'
+                env.APP_COLOR = 'blue'
+            } else {
+                error("Unexpected active Nginx port: ${activePort}")
             }
-        }
 
+            echo "New application version: ${env.APP_VERSION}"
+            echo "Deployment target port: ${env.TARGET_PORT}"
+            echo "Application color: ${env.APP_COLOR}"
+        }
+    }
+}
+
+         
+ 
         stage('Deploy Application') {
             steps {
                 sh '''
